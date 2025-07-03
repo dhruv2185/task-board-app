@@ -19,7 +19,7 @@ interface TaskFormProps {
 }
 
 const TaskForm: React.FC<TaskFormProps> = ({
-  columnId,
+  
   existingTask,
   onSave,
   onClose,
