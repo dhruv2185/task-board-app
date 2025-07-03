@@ -1,69 +1,94 @@
-# React + TypeScript + Vite
+# 🧩 Task Board Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A fully functional, visually organized task board application built with **React**, **TypeScript**, and **Drag-and-Drop (DnD Kit)**. Easily manage tasks across columns like **To Do**, **In Progress**, and **Done** with a clean, interactive UI.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 🗂️ Board View
+- Create new boards
+- View all boards in a tabular list
+- Click a board to view its details
 
-## Expanding the ESLint configuration
+### 📋 Board Detail Page
+- Add/edit/delete **columns** (like “To Do”, “In Progress”)
+- Add/edit/delete **tasks** with:
+  - Title, description, due date, creator name
+  - Priority tags: High, Medium, Low
+- Move tasks **between columns**
+- Reorder tasks **within the same column**
+- Drag overlay so dragged tasks don’t disappear
+- Empty column drop zones for clean UX
+- Filter and search tasks by title, description, priority, or due date
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 🛠️ Tech Stack
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+- **React** with **TypeScript**
+- **TailwindCSS** for styling
+- **@dnd-kit** for drag-and-drop
+- **Context API** for state management
+- **LocalStorage** to persist data
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 🧑‍💻 Installation & Setup
+
+```bash
+git clone https://github.com/your-username/task-board-app.git
+cd task-board-app
+
+# Install dependencies
+npm install
+
+# Run the app
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> Make sure you’re using Node.js version ≥ 16
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🧠 Project Structure
+
 ```
+src/
+├── components/
+│   ├── BoardTable.tsx
+│   ├── BoardDetailPage.tsx
+│   ├── ColumnModal.tsx
+│   ├── TaskCard.tsx
+├── context/
+│   └── BoardContext.tsx
+├── types/
+│   └── index.ts
+├── utils/
+│   └── localStorage.ts
+└── App.tsx
+```
+
+---
+
+## ✅ To-Do / Improvements
+
+- [ ] Add user authentication
+- [ ] Enable export/import of boards
+- [ ] Add animations for drag/drop
+- [ ] Improve mobile responsiveness
+
+---
+
+## 📄 License
+
+This project is open-source and free to use under the MIT License.
+
+---
+
+## 🙌 Acknowledgements
+
+- [`@dnd-kit`](https://github.com/clauderic/dnd-kit)
+- [TailwindCSS](https://tailwindcss.com/)
+
+---
+
+> Designed and built with ❤️ by Dhruv Ghevariya
