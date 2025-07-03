@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useBoard } from "../context/BoardContext";
@@ -7,16 +6,17 @@ import type { Task } from "../types";
 import Modal from "../components/Modal";
 import TaskForm from "../components/TaskForm";
 import TaskCard from "../components/TaskCard";
-
 import {
   DndContext,
   closestCenter,
   useDroppable,
   type DragEndEvent,
   type DragOverEvent,
+  type DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -43,8 +43,15 @@ const BoardDetailPage: React.FC = () => {
   const [filterPriority, setFilterPriority] = useState("");
   const [filterDueDate, setFilterDueDate] = useState("");
   const [hoveredColumnId, setHoveredColumnId] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
 
   const updateBoard = () => {
     const newBoards = [...boards];
@@ -54,12 +61,13 @@ const BoardDetailPage: React.FC = () => {
 
   const matchesFilter = (task: Task) =>
     (!search ||
-      task.title.includes(search) ||
-      task.description.includes(search)) &&
+      task.title.toLowerCase().includes(search.toLowerCase()) ||
+      task.description.toLowerCase().includes(search.toLowerCase())) &&
     (!filterPriority || task.priority === filterPriority) &&
     (!filterDueDate || task.dueDate === filterDueDate);
 
-  const openTaskModal = (colId: string, task?: Task) => {
+  const openTaskModal = (colId: string
+, task?: Task) => {
     setSelectedColumnId(colId);
     setEditingTask(task || null);
     setModalOpen(true);
@@ -83,9 +91,10 @@ const BoardDetailPage: React.FC = () => {
     setColumnTitle("");
     updateBoard();
   };
+
   const EmptyDropZone: React.FC<{ columnId: string }> = ({ columnId }) => {
     const { setNodeRef, isOver } = useDroppable({
-      id: columnId,
+      id: `dropzone-${columnId}`,
       data: { columnId },
     });
 
@@ -100,24 +109,39 @@ const BoardDetailPage: React.FC = () => {
       </div>
     );
   };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const activeId = active.id.toString();
+    const activeColumnId = active.data.current?.columnId;
+    const sourceCol = board.columns.find((c) => c.id === activeColumnId);
+    if (sourceCol) {
+      const task = sourceCol.tasks.find((t) => t.id === activeId);
+      setActiveTask(task || null);
+    }
+  };
+
   const handleDragOver = (event: DragOverEvent) => {
-    const columnId = event.over?.data?.current?.columnId;
-    if (columnId) {
+    const { over } = event;
+    if (over) {
+      const columnId = over.data.current?.columnId || over.id.toString().replace('dropzone-', '');
       setHoveredColumnId(columnId);
+    } else {
+      setHoveredColumnId(null);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setHoveredColumnId(null);
+    setActiveTask(null);
 
     if (!over || active.id === over.id) return;
 
     const activeId = active.id.toString();
     const overId = over.id.toString();
-
     const activeColumnId = active.data.current?.columnId;
-    const overColumnId = over.data.current?.columnId || overId;
+    const overColumnId = over.data.current?.columnId || overId.replace('dropzone-', '');
 
     if (!activeColumnId || !overColumnId) return;
 
@@ -131,10 +155,8 @@ const BoardDetailPage: React.FC = () => {
     if (!task) return;
 
     if (sourceCol.id === targetCol.id) {
-      // Reorder within the same column
-      targetCol.tasks = arrayMove(targetCol.tasks, activeIndex, overIndex);
+      targetCol.tasks = arrayMove(targetCol.tasks, activeIndex, overIndex >= 0 ? overIndex : targetCol.tasks.length);
     } else {
-      // Move across columns
       sourceCol.tasks.splice(activeIndex, 1);
       const insertAt = overIndex >= 0 ? overIndex : targetCol.tasks.length;
       targetCol.tasks.splice(insertAt, 0, task);
@@ -193,8 +215,9 @@ const BoardDetailPage: React.FC = () => {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+        onDragStart={handleDragStart}
         onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
       >
         <div className="flex gap-6 overflow-x-auto pb-6">
           {board.columns.map((col) => (
@@ -233,10 +256,10 @@ const BoardDetailPage: React.FC = () => {
               </div>
 
               <SortableContext
-                items={col.tasks.length ? col.tasks.map((t) => t.id) : [col.id]}
+                items={col.tasks.map((t) => t.id).concat(`dropzone-${col.id}`)}
                 strategy={rectSortingStrategy}
               >
-                {col.tasks.length === 0 ? (
+                {col.tasks.length === 0 || col.tasks.filter(matchesFilter).length === 0 ? (
                   <EmptyDropZone columnId={col.id} />
                 ) : (
                   col.tasks
@@ -248,6 +271,7 @@ const BoardDetailPage: React.FC = () => {
                         columnId={col.id}
                         onEdit={openTaskModal}
                         onDelete={deleteTask}
+                        isDragging={activeTask?.id === task.id}
                       />
                     ))
                 )}
@@ -262,6 +286,18 @@ const BoardDetailPage: React.FC = () => {
             </div>
           ))}
         </div>
+
+        <DragOverlay>
+          {activeTask ? (
+            <TaskCard
+              task={activeTask}
+              columnId={activeTask.id}
+              onEdit={() => {}}
+              onDelete={() => {}}
+              isDragging={true}
+            />
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
