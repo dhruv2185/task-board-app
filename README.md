@@ -35,7 +35,7 @@ A fully functional, visually organized task board application built with **React
 ## 🧑‍💻 Installation & Setup
 
 ```bash
-git clone https://github.com/your-username/task-board-app.git
+git clone https://github.com/dhruv2185/task-board-app.git
 cd task-board-app
 
 # Install dependencies
