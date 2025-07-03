@@ -1,4 +1,4 @@
-// BoardDetailPage.tsx – integrates ColumnDndWrapper and TaskDndWrapper
+
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useBoard } from "../context/BoardContext";
@@ -6,8 +6,23 @@ import { v4 as uuid } from "uuid";
 import type { Task } from "../types";
 import Modal from "../components/Modal";
 import TaskForm from "../components/TaskForm";
-import TaskDndWrapper from "../components/TaskDndWrapper";
-import ColumnDndWrapper from "../components/ColumnDndWrapper";
+import TaskCard from "../components/TaskCard";
+
+import {
+  DndContext,
+  closestCenter,
+  useDroppable,
+  type DragEndEvent,
+  type DragOverEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  rectSortingStrategy,
+  SortableContext,
+} from "@dnd-kit/sortable";
 
 const priorities = ["low", "medium", "high"] as const;
 
@@ -27,6 +42,9 @@ const BoardDetailPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [filterDueDate, setFilterDueDate] = useState("");
+  const [hoveredColumnId, setHoveredColumnId] = useState<string | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor));
 
   const updateBoard = () => {
     const newBoards = [...boards];
@@ -63,6 +81,65 @@ const BoardDetailPage: React.FC = () => {
       board.columns.push({ id: uuid(), title: columnTitle, tasks: [] });
     }
     setColumnTitle("");
+    updateBoard();
+  };
+  const EmptyDropZone: React.FC<{ columnId: string }> = ({ columnId }) => {
+    const { setNodeRef, isOver } = useDroppable({
+      id: columnId,
+      data: { columnId },
+    });
+
+    return (
+      <div
+        ref={setNodeRef}
+        className={`min-h-[100px] flex items-center justify-center border-2 border-dashed rounded ${
+          isOver ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-gray-50"
+        } text-sm text-gray-500`}
+      >
+        Drop task here
+      </div>
+    );
+  };
+  const handleDragOver = (event: DragOverEvent) => {
+    const columnId = event.over?.data?.current?.columnId;
+    if (columnId) {
+      setHoveredColumnId(columnId);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setHoveredColumnId(null);
+
+    if (!over || active.id === over.id) return;
+
+    const activeId = active.id.toString();
+    const overId = over.id.toString();
+
+    const activeColumnId = active.data.current?.columnId;
+    const overColumnId = over.data.current?.columnId || overId;
+
+    if (!activeColumnId || !overColumnId) return;
+
+    const sourceCol = board.columns.find((c) => c.id === activeColumnId);
+    const targetCol = board.columns.find((c) => c.id === overColumnId);
+    if (!sourceCol || !targetCol) return;
+
+    const activeIndex = sourceCol.tasks.findIndex((t) => t.id === activeId);
+    const overIndex = targetCol.tasks.findIndex((t) => t.id === overId);
+    const task = sourceCol.tasks[activeIndex];
+    if (!task) return;
+
+    if (sourceCol.id === targetCol.id) {
+      // Reorder within the same column
+      targetCol.tasks = arrayMove(targetCol.tasks, activeIndex, overIndex);
+    } else {
+      // Move across columns
+      sourceCol.tasks.splice(activeIndex, 1);
+      const insertAt = overIndex >= 0 ? overIndex : targetCol.tasks.length;
+      targetCol.tasks.splice(insertAt, 0, task);
+    }
+
     updateBoard();
   };
 
@@ -112,17 +189,20 @@ const BoardDetailPage: React.FC = () => {
           </button>
         </div>
       </div>
-      <div className="flex gap-6 overflow-x-auto pb-6">
-        <ColumnDndWrapper
-          columns={board.columns}
-          onReorder={(newCols) => {
-            board.columns = newCols;
-            updateBoard();
-          }}
-          renderColumn={(col) => (
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+      >
+        <div className="flex gap-6 overflow-x-auto pb-6">
+          {board.columns.map((col) => (
             <div
               key={col.id}
-              className="min-w-[280px] bg-white rounded-xl shadow p-4"
+              className={`min-w-[280px] flex-shrink-0 rounded-xl shadow p-4 transition-colors duration-200 ${
+                hoveredColumnId === col.id ? "bg-blue-50" : "bg-white"
+              }`}
             >
               <div className="flex justify-between items-center mb-3">
                 <h2 className="text-lg font-semibold">{col.title}</h2>
@@ -152,55 +232,26 @@ const BoardDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              <TaskDndWrapper
-                columnId={col.id}
-                tasks={col.tasks.filter(matchesFilter)}
-                renderTask={(task) => (
-                  <div
-                    key={task.id}
-                    className="bg-gray-100 p-3 rounded mb-3 shadow-sm"
-                  >
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-semibold text-sm">{task.title}</h3>
-                      <span
-                        className={`text-xs px-2 py-1 rounded bg-${
-                          task.priority === "high"
-                            ? "red"
-                            : task.priority === "medium"
-                            ? "yellow"
-                            : "green"
-                        }-200`}
-                      >
-                        {task.priority}
-                      </span>
-                    </div>
-                    <p className="text-xs mt-1 text-gray-600">
-                      {task.description}
-                    </p>
-                    <p className="text-xs mt-1">
-                      By: {task.createdBy} • Due: {task.dueDate}
-                    </p>
-                    <div className="mt-2 text-xs text-right space-x-2">
-                      <button
-                        onClick={() => openTaskModal(col.id, task)}
-                        className="text-blue-600"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => deleteTask(col.id, task.id)}
-                        className="text-red-600"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+              <SortableContext
+                items={col.tasks.length ? col.tasks.map((t) => t.id) : [col.id]}
+                strategy={rectSortingStrategy}
+              >
+                {col.tasks.length === 0 ? (
+                  <EmptyDropZone columnId={col.id} />
+                ) : (
+                  col.tasks
+                    .filter(matchesFilter)
+                    .map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        columnId={col.id}
+                        onEdit={openTaskModal}
+                        onDelete={deleteTask}
+                      />
+                    ))
                 )}
-                onReorder={(newTasks) => {
-                  col.tasks = newTasks;
-                  updateBoard();
-                }}
-              />
+              </SortableContext>
 
               <button
                 onClick={() => openTaskModal(col.id)}
@@ -209,9 +260,10 @@ const BoardDetailPage: React.FC = () => {
                 + Add Task
               </button>
             </div>
-          )}
-        />
-      </div>
+          ))}
+        </div>
+      </DndContext>
+
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
         <TaskForm
           columnId={selectedColumnId!}
