@@ -23,8 +23,23 @@ import {
   rectSortingStrategy,
   SortableContext,
 } from "@dnd-kit/sortable";
+import {
+  MagnifyingGlassIcon,
+  CalendarIcon,
+  PlusIcon,
+  ChevronDownIcon,
+  TrashIcon,
+  PencilIcon,
+} from "@heroicons/react/24/outline";
 
-const priorities = ["low", "medium", "high"] as const;
+const priorities = ["LOW", "MEDIUM", "HIGH"] as const;
+const sortOptions = [
+  { value: "", label: "Filter By..." },
+  { value: "title-asc", label: "Title (A-Z)" },
+  { value: "title-desc", label: "Title (Z-A)" },
+  { value: "dueDate-asc", label: "Due Date (Earliest)" },
+  { value: "dueDate-desc", label: "Due Date (Latest)" },
+] as const;
 
 const BoardDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -42,6 +57,7 @@ const BoardDetailPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [filterDueDate, setFilterDueDate] = useState("");
+  const [sortBy, setSortBy] = useState("");
   const [hoveredColumnId, setHoveredColumnId] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
@@ -66,8 +82,24 @@ const BoardDetailPage: React.FC = () => {
     (!filterPriority || task.priority === filterPriority) &&
     (!filterDueDate || task.dueDate === filterDueDate);
 
-  const openTaskModal = (colId: string
-, task?: Task) => {
+  const sortTasks = (tasks: Task[]) => {
+    if (!sortBy) return tasks;
+    const [key, direction] = sortBy.split("-");
+    return [...tasks].sort((a, b) => {
+      if (key === "title") {
+        return direction === "asc"
+          ? a.title.localeCompare(b.title)
+          : b.title.localeCompare(a.title);
+      } else if (key === "dueDate") {
+        return direction === "asc"
+          ? new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+          : new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+      }
+      return 0;
+    });
+  };
+
+  const openTaskModal = (colId: string, task?: Task) => {
     setSelectedColumnId(colId);
     setEditingTask(task || null);
     setModalOpen(true);
@@ -101,9 +133,9 @@ const BoardDetailPage: React.FC = () => {
     return (
       <div
         ref={setNodeRef}
-        className={`min-h-[100px] flex items-center justify-center border-2 border-dashed rounded ${
-          isOver ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-gray-50"
-        } text-sm text-gray-500`}
+        className={`min-h-[120px] flex items-center justify-center border-2 border-dashed rounded-lg transition-colors ${
+          isOver ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-gray-100"
+        } text-sm text-gray-500 font-medium`}
       >
         Drop task here
       </div>
@@ -124,7 +156,9 @@ const BoardDetailPage: React.FC = () => {
   const handleDragOver = (event: DragOverEvent) => {
     const { over } = event;
     if (over) {
-      const columnId = over.data.current?.columnId || over.id.toString().replace('dropzone-', '');
+      const columnId =
+        over.data.current?.columnId ||
+        over.id.toString().replace("dropzone-", "");
       setHoveredColumnId(columnId);
     } else {
       setHoveredColumnId(null);
@@ -141,7 +175,8 @@ const BoardDetailPage: React.FC = () => {
     const activeId = active.id.toString();
     const overId = over.id.toString();
     const activeColumnId = active.data.current?.columnId;
-    const overColumnId = over.data.current?.columnId || overId.replace('dropzone-', '');
+    const overColumnId =
+      over.data.current?.columnId || overId.replace("dropzone-", "");
 
     if (!activeColumnId || !overColumnId) return;
 
@@ -155,7 +190,11 @@ const BoardDetailPage: React.FC = () => {
     if (!task) return;
 
     if (sourceCol.id === targetCol.id) {
-      targetCol.tasks = arrayMove(targetCol.tasks, activeIndex, overIndex >= 0 ? overIndex : targetCol.tasks.length);
+      targetCol.tasks = arrayMove(
+        targetCol.tasks,
+        activeIndex,
+        overIndex >= 0 ? overIndex : targetCol.tasks.length
+      );
     } else {
       sourceCol.tasks.splice(activeIndex, 1);
       const insertAt = overIndex >= 0 ? overIndex : targetCol.tasks.length;
@@ -165,162 +204,204 @@ const BoardDetailPage: React.FC = () => {
     updateBoard();
   };
 
-  if (!board) return <div className="p-4">Board not found.</div>;
+  if (!board)
+    return <div className="p-6 text-gray-600 text-lg">Board not found.</div>;
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-3xl font-bold mb-4">{board.title}</h1>
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+          {board.title}
+        </h1>
 
-      <div className="flex flex-wrap gap-4 mb-6 items-center">
-        <input
-          className="border p-2 rounded"
-          placeholder="Search..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="border p-2 rounded"
-          value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-        >
-          <option value="">All Priorities</option>
-          {priorities.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <input
-          className="border p-2 rounded"
-          type="date"
-          value={filterDueDate}
-          onChange={(e) => setFilterDueDate(e.target.value)}
-        />
-        <div className="flex items-center gap-2">
-          <input
-            className="border p-2 rounded"
-            placeholder="New column title"
-            value={columnTitle}
-            onChange={(e) => setColumnTitle(e.target.value)}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 bg-white p-4 rounded-lg shadow-sm">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-text"
+              placeholder="Search tasks..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative">
+            <select
+              className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none"
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+            >
+              <option value="">All Priorities</option>
+              {priorities.map((p) => (
+                <option key={p} value={p} className="capitalize">
+                  {p}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          </div>
+          <div className="relative">
+            <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              type="date"
+              value={filterDueDate}
+              onChange={(e) => setFilterDueDate(e.target.value)}
+            />
+          </div>
+          <div className="relative">
+            <select
+              className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          </div>
+          <div className="relative col-span-1 sm:col-span-2 lg:col-span-2">
+            <PlusIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-text"
+              placeholder="New column title"
+              value={columnTitle}
+              onChange={(e) => setColumnTitle(e.target.value)}
+            />
+          </div>
           <button
-            className="bg-green-600 text-white px-4 py-2 rounded"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors cursor-pointer text-sm font-medium flex items-center gap-2"
             onClick={addColumn}
           >
-            {editingColumnIndex !== null ? "Save" : "+ Add Column"}
+            <PlusIcon className="h-5 w-5" />
+            {editingColumnIndex !== null ? "Save Column" : "Add Column"}
           </button>
         </div>
-      </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-6 overflow-x-auto pb-6">
-          {board.columns.map((col) => (
-            <div
-              key={col.id}
-              className={`min-w-[280px] flex-shrink-0 rounded-xl shadow p-4 transition-colors duration-200 ${
-                hoveredColumnId === col.id ? "bg-blue-50" : "bg-white"
-              }`}
-            >
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-lg font-semibold">{col.title}</h2>
-                <div className="flex gap-2 text-sm">
-                  <button
-                    onClick={() => {
-                      setColumnTitle(col.title);
-                      setEditingColumnIndex(
-                        board.columns.findIndex((c) => c.id === col.id)
-                      );
-                    }}
-                    className="text-blue-600"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="text-red-600"
-                    onClick={() => {
-                      board.columns = board.columns.filter(
-                        (c) => c.id !== col.id
-                      );
-                      updateBoard();
-                    }}
-                  >
-                    ×
-                  </button>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-6 overflow-x-auto pb-6">
+            {board.columns.map((col) => (
+              <div
+                key={col.id}
+                className={`min-w-[300px] flex-shrink-0 rounded-xl shadow-lg p-4 bg-white transition-all duration-200 flex flex-col ${
+                  hoveredColumnId === col.id
+                    ? "ring-2 ring-blue-300 bg-blue-50"
+                    : ""
+                }`}
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800">
+                    {col.title}
+                  </h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setColumnTitle(col.title);
+                        setEditingColumnIndex(
+                          board.columns.findIndex((c) => c.id === col.id)
+                        );
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium cursor-pointer flex items-center gap-1"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                      Edit
+                    </button>
+                    <button
+                      className="text-red-600 hover:text-red-800 text-sm font-medium cursor-pointer flex items-center gap-1"
+                      onClick={() => {
+                        board.columns = board.columns.filter(
+                          (c) => c.id !== col.id
+                        );
+                        updateBoard();
+                      }}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
+
+                <SortableContext
+                  items={col.tasks
+                    .map((t) => t.id)
+                    .concat(`dropzone-${col.id}`)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="flex-1">
+                    {col.tasks.length === 0 ||
+                    col.tasks.filter(matchesFilter).length === 0 ? (
+                      <EmptyDropZone columnId={col.id} />
+                    ) : (
+                      sortTasks(col.tasks.filter(matchesFilter)).map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          columnId={col.id}
+                          onEdit={openTaskModal}
+                          onDelete={deleteTask}
+                          isDragging={activeTask?.id === task.id}
+                        />
+                      ))
+                    )}
+                  </div>
+                </SortableContext>
+
+                <button
+                  onClick={() => openTaskModal(col.id)}
+                  className="w-full text-blue-600 hover:text-blue-800 text-sm font-medium mt-3 cursor-pointer flex items-center gap-2"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                  Add Task
+                </button>
               </div>
+            ))}
+          </div>
 
-              <SortableContext
-                items={col.tasks.map((t) => t.id).concat(`dropzone-${col.id}`)}
-                strategy={rectSortingStrategy}
-              >
-                {col.tasks.length === 0 || col.tasks.filter(matchesFilter).length === 0 ? (
-                  <EmptyDropZone columnId={col.id} />
-                ) : (
-                  col.tasks
-                    .filter(matchesFilter)
-                    .map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        columnId={col.id}
-                        onEdit={openTaskModal}
-                        onDelete={deleteTask}
-                        isDragging={activeTask?.id === task.id}
-                      />
-                    ))
-                )}
-              </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {activeTask ? (
+              <TaskCard
+                task={activeTask}
+                columnId={activeTask.id}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                isDragging={true}
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
 
-              <button
-                onClick={() => openTaskModal(col.id)}
-                className="text-blue-600 text-sm mt-2"
-              >
-                + Add Task
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <DragOverlay>
-          {activeTask ? (
-            <TaskCard
-              task={activeTask}
-              columnId={activeTask.id}
-              onEdit={() => {}}
-              onDelete={() => {}}
-              isDragging={true}
-            />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
-        <TaskForm
-          columnId={selectedColumnId!}
-          existingTask={editingTask ?? undefined}
-          onClose={() => setModalOpen(false)}
-          onSave={(task) => {
-            const column = board.columns.find((c) => c.id === selectedColumnId);
-            if (!column) return;
-            if (editingTask) {
-              const index = column.tasks.findIndex(
-                (t) => t.id === editingTask.id
+        <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
+          <TaskForm
+            columnId={selectedColumnId!}
+            existingTask={editingTask ?? undefined}
+            onClose={() => setModalOpen(false)}
+            onSave={(task) => {
+              const column = board.columns.find(
+                (c) => c.id === selectedColumnId
               );
-              column.tasks[index] = task;
-            } else {
-              column.tasks.push(task);
-            }
-            updateBoard();
-            setModalOpen(false);
-          }}
-        />
-      </Modal>
+              if (!column) return;
+              if (editingTask) {
+                const index = column.tasks.findIndex(
+                  (t) => t.id === editingTask.id
+                );
+                column.tasks[index] = task;
+              } else {
+                column.tasks.push(task);
+              }
+              updateBoard();
+              setModalOpen(false);
+            }}
+          />
+        </Modal>
+      </div>
     </div>
   );
 };
